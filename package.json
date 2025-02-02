@@ -1,0 +1,17 @@
+{
+  "name": "logseq-kanban-udiboy",
+  "version": "0.1",
+  "author": "udiboy1209",
+  "main": "index.html",
+  "description": "Custom Kanban Plugin for my use.",
+  "license": "MIT",
+  "devDependencies": {
+    "@logseq/libs": "^0.0.1-alpha.29"
+  },
+  "browserslist": [
+    "chrome 80"
+  ],
+  "logseq": {
+    "id": "logseq-kanban-udiboy"
+  }
+}
