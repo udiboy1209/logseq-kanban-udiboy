@@ -72,6 +72,13 @@ async function getCardHTML(task, tagsmap) {
         properties.push(`<span class="mykanban-deadline">${deadline}</span>`)
         desc = dets[0]
     }
+    // Get schedule
+    if (task.scheduled) {
+        const dets = desc.split("\n")
+        const scheduled = dets[1].replace("SCHEDULED: ", "")
+        properties.push(`<span class="mykanban-deadline">${scheduled}</span>`)
+        desc = dets[0]
+    }
     const subtasks = []
     const withchildren = await logseq.Editor.getBlock(task.id, {includeChildren: true})
     for (const child of withchildren.children) {
@@ -83,7 +90,7 @@ async function getCardHTML(task, tagsmap) {
             subtasks.push(`<li><s>${child.content.substring(5)}</s></li>`)
     }
 
-    return `
+    html = `
 <div class="mykanban-card" data-on-click="openTask" data-page="${task.page.name}" data-block="${task.uuid}">
     <p>${desc}</p>
     <div class="mykanban-card-properties">
@@ -93,6 +100,16 @@ async function getCardHTML(task, tagsmap) {
         ${subtasks.join("\n")}
     </ul>
 </div>`
+
+    for (const r of task.refs) {
+        // Add span for each tag
+        if (!tagsmap.has(r.id))
+            continue
+        if (task.marker == "TODO")
+            tagsmap.get(r.id).todo.push(html)
+        else if (task.marker == "DOING")
+            tagsmap.get(r.id).doing.push(html)
+    }
 }
 
 function main() {
@@ -126,31 +143,46 @@ function main() {
         const tagsmap = new Map()
         for (const ref of refsblk.refs) {
             const tagpage = await logseq.Editor.getPage(ref.id)
-            tagsmap.set(ref.id, {color: colors.shift(), name: tagpage.originalName});
+            tagsmap.set(ref.id, {color: colors.shift(), name: tagpage.originalName, todo: [], doing: []});
         }
 
-        const todotasks = []
-        const doingtasks = []
         for (const t of tasks) {
             // No tag must mean this is a subtask
             // There is always 1 ref of marker, more refs indicate tag
             if (t.refs.length == 1) continue
 
-            const carddiv = await getCardHTML(t, tagsmap)
-            if (t.marker === "TODO")
-                todotasks.push(carddiv)
-            else if (t.marker === "DOING")
-                doingtasks.push(carddiv)
+            refid = null
+            for (const r of t.refs) {
+                if (tagsmap.has(r.id)) {
+                    refid = r.id
+                    break
+                }
+            }
+            await getCardHTML(t, tagsmap)
+        }
+
+        todohtml = ""
+        doinghtml = ""
+        for (const ref of refsblk.refs) {
+            dets = tagsmap.get(ref.id)
+            if (dets.todo.length != 0) {
+                todohtml += `<h2>${dets.name}</h2>
+                    ${dets.todo.join('\n')}`
+            }
+            if (dets.doing.length != 0) {
+                doinghtml += `<h2>${dets.name}</h2>
+                    ${dets.doing.join('\n')}`
+            }
         }
 
         const html = `
 <div class="mykanban-column">
     <h2>TODO</h2>
-    ${todotasks.join('\n')}
+    ${todohtml}
 </div>
 <div class="mykanban-column">
     <h2>DOING</h2>
-    ${doingtasks.join('\n')}
+    ${doinghtml}
 </div>
 `
         logseq.provideUI({key: kanbanId, slot, reset: true, template: html})
